@@ -16,6 +16,9 @@
 	       body{
 	           font-family: monospace !important;
 	       }
+
+
+
 	</style>
 </head>
 <body>
@@ -23,235 +26,142 @@
 		<h1 class="text-center">Hello, Wordle!</h1>
 		<div class="text-center">
 			<hr>
-			<?php
-			    $start        = microtime( true );
-			    $form_entries = false;
-			    if ( isset( $_POST[ 'gray' ] ) ) {
-			        $gray = strtolower( $_POST[ 'gray' ] );
-			        $gray = preg_replace( '/[^a-z]/i', '', $gray );
-			        if ( strlen( $gray ) !== 0 ) {
-			            $exclude_list = $gray;
-			            $form_entries = true;
-			        } else {
-			            $exclude_list = '';
-			        }
-			    } else {
-			        $exclude_list = '';
-			    }
-			    if ( isset( $_POST[ 'gold' ] ) ) {
-			        $gold = strtolower( $_POST[ 'gold' ] );
-			        $gold = preg_replace( '/[^a-z]/i', '', $gold );
-			        if ( strlen( $gold ) !== 0 ) {
-			            $include_list = $gold;
-			            $form_entries = true;
-			        } else {
-			            $include_list = '';
-			        }
-			    } else {
-			        $include_list = '';
-			    }
-			    for ( $i = 1; $i <= 5; $i++ ) {
-			        if ( isset( $_POST[ "p" . $i ] ) ) {
-			            $p[ $i ] = strtolower( $_POST[ "p" . $i ] );
-			            $p[ $i ] = preg_replace( '/[^a-z]/i', '', $p[ $i ] );
-			        } else {
-			            $p[ $i ] = '';
-			        }
-			    }
-			    $word_list   = explode( PHP_EOL, file_get_contents( 'list.txt' ) );
-			    $total_words = count( $word_list );
-			    if ( strlen( $exclude_list ) !== 0 ) {
-			        $exclude_list = array_unique( str_split( $exclude_list ) );
-			        if ( is_array( $exclude_list ) ) {
-			            $exclude_list = array_diff( $exclude_list, $p ); //remove all the greens from the excludes
-			        }
-			        foreach ( $word_list as $key => $word ) {
-			            foreach ( $exclude_list as $letter ) {
-			                if ( substr_count( $word, $letter ) > 0 ) {
-			                    unset( $word_list[ $key ] );
-			                }
-			            }
-			        }
-			    }
-			    if ( strlen( $include_list ) !== 0 ) {
-			        $include_list = array_unique( str_split( $include_list ) );
-			        if ( is_array( $exclude_list ) ) {
-			            $include_list = array_diff( $include_list, $exclude_list ); //remove all the excludes from the includes
-			        }
-			        foreach ( $word_list as $key => $word ) {
-			            foreach ( $include_list as $letter ) {
-			                if ( substr_count( $word, $letter ) < 1 ) {
-			                    unset( $word_list[ $key ] );
-			                }
-			            }
-			        }
-			    }
-			    if ( strlen( trim( implode( $p ) ) ) !== 0 ) {
-			        foreach ( $word_list as $key => $word ) {
-			            $word = str_split( $word );
-			            for ( $i = 0; $i < 5; $i++ ) {
-			                if ( $p[ $i + 1 ] !== '' && $p[ $i + 1 ] != $word[ $i ] ) {
-			                    unset( $word_list[ $key ] );
-			                }
-			            }
-			        }
-			    }
-			    if ( count( $word_list ) == 0 ) {
-			        echo "<h2>Error: No Words Match the Entered Gray/gold/green Letters. Resetting.</h2>";
-			        $word_list    = explode( PHP_EOL, file_get_contents( 'list.txt' ) );
-			        $exclude_list = '';
-			        $include_list = '';
-			    }
-			?>
-			<form action="index.php" method="post">
-				Exclude (Gray): <input name="gray" type="text" value="<?php if(is_array( $exclude_list)){ echo implode($exclude_list);} ?>"><br>
-				<br>
-				Include (Gold): <input name="gold" type="text" value="<?php if(is_array( $include_list)){ echo implode($include_list);} ?>"><br>
-				<br>
-				Correct Postion (Green):<br>
-				<input maxlength="1" name="p1" size="1" type="text" value="<?php echo $p[1]; ?>"> &nbsp; <input maxlength="1" name="p2" size="1" type="text" value="<?php echo $p[2]; ?>"> &nbsp; <input maxlength="1" name="p3" size="1" type="text" value="<?php echo $p[3]; ?>"> &nbsp; <input maxlength="1" name="p4" size="1" type="text" value="<?php echo $p[4]; ?>"> &nbsp; <input maxlength="1" name="p5" size="1" type="text" value="<?php echo $p[5]; ?>"><br>
-				<br>
+		<?php
+
+
+           if(count($_POST)>=1){//check to see if we got anything in the form
+                foreach($_POST as $box => $letter){ //look at each square from the form
+                    if(stripos($box, 'radio') !== false)//check to see what kind of input we're looking at, if it says 'radio' it's the type of letter, ie exclude, include, correct
+                    {
+                        $radio_data = $letter;
+                        $radio_data = clean_input($radio_data); // make sure the input is a single letter
+
+                        $box = str_replace('radio_','',$box); // strip the 'radio/ from the box
+                        $box = explode('_',$box); //get the row & column from the box variable ie '5_3' to array(5, 3) for building the 2d array
+                        $letter_type[$box[0]][$box[1]] = $radio_data; //add the validated input to the array
+                    }else{
+                        $letter = clean_input($letter); // make sure the input is a single letter
+                        $box = explode('_',$box); //get the row & column from the box variable ie '5_3' to array(5, 3) for building the 2d array
+                        $letters[$box[0]][$box[1]] = $letter; //add the validated input to the array
+                    }
+                }
+               
+         }
+        ?>
+        	<form action="index.php" method="post"> 
+                <?php //print out the form
+				    for($i=1;$i<=6;$i++){ //6 rows
+                        echo '<div class="row">';
+                        for($j=1;$j<=5;$j++){ //by 5 letters
+                            if(isset($letters[$i][$j])){ //make sure the letter variable is set before we reference
+                                $form_letter= strtoupper($letters[$i][$j]);
+                            }else{
+                                $form_letter='';
+                            }
+
+                            $exclude = '';//reset variables up for showing which box is checked
+                            $include = '';
+                            $correct = '';
+                            if(isset($letter_type[$i][$j])){ //check to see which box is checked and set the correct one
+                                switch ($letter_type[$i][$j]) {
+                                    case 'e':
+                                        $exclude = ' checked';
+                                        break;
+                                    case 'i':
+                                        $include = ' checked';
+                                        break;
+                                    case 'c':
+                                        $correct = ' checked';
+                                        break;                                       
+                                }
+                            }
+                            echo '<div class="col-xs-2 ml-1 m-r1"><input maxlength="1" name="'.$i.'_'.$j.'" size="1" type="text" value="'.$form_letter.'"><br>
+                            <div style="background-color:#787c7e;"><input style="margin-left:-5px;" type="radio" name="radio_'.$i.'_'.$j.'" value="exclude"'.$exclude.'></div>
+                            <div style="background-color:#c9b458;"><input style="margin-left:-5px;" type="radio" name="radio_'.$i.'_'.$j.'" value="include"'.$include.'></div>
+                            <div style="background-color:#6aaa64;"><input style="margin-left:-5px;" type="radio" name="radio_'.$i.'_'.$j.'" value="correct"'.$correct.'></div>
+                            </div>'; //output the form row with the valid entries
+                        }
+                        echo '</div><br>';
+                    }
+
+                   // echo '<div class="row"><div class="col-md-4"><pre>'.print_r($_POST,true).'</pre></div>
+                  // <div class="col-md-4"><pre>'.print_r($letters,true).'</pre></div>
+                  //  <div class="col-md-4"><pre>'.print_r( $letter_type,true).'</pre></div></div>';
+                ?>
+
+      
+                <br>
 				<input type="submit">
 			</form>
-		</div>
-		<hr>
-		<?php
-		    $total_letters = 0;
-		    foreach ( $word_list as $word ) {
-		        $letters = str_split( $word );
-		        for ( $i = 0; $i < count( $letters ); $i++ ) {
-		            if ( isset( $frequency_raw[ strtolower( $letters[ $i ] ) ] ) ) {
-		                $frequency_raw[ strtolower( $letters[ $i ] ) ]++;
-		            } else {
-		                $frequency_raw[ strtolower( $letters[ $i ] ) ] = 1;
-		            }
-		            if ( isset( $frequency_position_raw[ $i + 1 ][ strtolower( $letters[ $i ] ) ] ) ) {
-		                $frequency_position_raw[ $i + 1 ][ strtolower( $letters[ $i ] ) ]++;
-		            } else {
-		                $frequency_position_raw[ $i + 1 ][ strtolower( $letters[ $i ] ) ] = 1;
-		            }
-		            $total_letters++;
+
+
+            <?php
+                $word_list     = explode( PHP_EOL, file_get_contents( 'list.txt' ) ); //get the wordlist and convert it to an array
+                $total_words   = count( $word_list );
+                                foreach ( $word_list as $word ) { //look at each word individually
+                    $letters = str_split( $word ); // turn the word into an array
+                    for ( $i = 0; $i < count( $letters ); $i++ ) { //loop through the letters of each word
+
+                        //do a frequnecy analasis for all letters of all words
+                        if ( isset( $frequency_raw[ $letters[ $i ] ] ) ) { //if the array key doesn't exist we need to set it to zero before incrementing
+                            $frequency_raw[ $letters[ $i ] ]++;
+                        } else {
+                            $frequency_raw[ $letters[ $i ] ] = 1;
+                        }
+
+                        //do a frequnecy analasis for each letter position in each word
+                        //count how many times a given letter occurs at a given position in the word
+                        if ( isset( $frequency_position_raw[ $i + 1 ][ $letters[ $i ] ] ) ) { //if the array key doesn't exist we need to set it to zero before incrementing
+                            $frequency_position_raw[ $i + 1 ][ $letters[ $i ] ]++;
+                        } else {
+                            $frequency_position_raw[ $i + 1 ][ $letters[ $i ] ] = 1;
+                        }
+
+                    }
+                }
+
+		        foreach ( $frequency_position_raw as $index => $position) { //look at the first position probablites
+                   foreach ($position as $letter => $count ){ // look at each letter in the postional probablites
+                        $frequency_position [$index][ $letter ] = ( $count / ( $total_words ) ) * 100; //calcuate actual probablity
+                   }
+                   ksort($frequency_position [$index]);
 		        }
-		    }
-		    ob_start();
-		    echo '<div class="row">
-		    <div class="col-md-3">
-		    <div class="text-center">
-		        <table class="table table-sm">
-		            <tr>
-		                <th colspan="2">Overall Frequency</th>
-		            </tr>
-		            <tr>
-		                <th>Letter</th>
-		                <th>Percentage</th>
-		            </tr>';
-		    $frequency = generate_frequency_and_table( $frequency_raw, $total_letters, true, true );
-		    echo '</table></div></div>';
-		    $i = 1;
-		    foreach ( $frequency_position_raw as $frequency_position_raw_single ) {
-		        $frequency_position[ $i ] = generate_frequency_and_table( $frequency_position_raw_single, $total_letters / 5, false, true );
-		        $i++;
-		    }
-		    echo '
-		    <div class="col-md-9">
-		    <div class="text-center" >
-		        <table class="table table-sm">
-		            <tr>
-		                <th colspan="7">Positional Frequency</th>
-		            </th>
-		            <tr>
-		                <th>&nbsp;</th>
-		                <th>1</th>
-		                <th>2</th>
-		                <th>3</th>
-		                <th>4</th>
-		                <th>5</th>
-		                <th>&nbsp;</th>';
-		    $letters = array('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z');
-		    if ( is_array( $exclude_list ) ) {
-		        $letters = array_diff( $letters, $exclude_list );
-		    }
-		    foreach ( $letters as $letter ) {
-		        echo "<tr><th>" . strtoupper( $letter ) . "</th>";
-		        for ( $i = 1; $i <= 5; $i++ ) {
-		            if ( !isset( $frequency_position[ $i ][ $letter ] ) ) {
-		                $frequency_position[ $i ][ $letter ] = 0;
-		            }
-		            echo '<td style="background-color:hsl(' . round( ( $frequency_position[ $i ][ $letter ] * 100 ) * ( 1 / $frequency_position[ $i ][ 'highest' ] ) ) . 'deg 100% 50% / 50%);">' . round( $frequency_position[ $i ][ $letter ] * 100, 2 ) . '%</td>';
-		        }
-		        echo "<th>" . strtoupper( $letter ) . "</th></tr>";
-		    }
-		    echo '</table></div></div></div>';
-		    function generate_frequency_and_table( $input_raw, $total_letters, $echo = false, $sort_by_key = false ) {
-		        $highest = 0;
-		        foreach ( $input_raw as $letter => $count ) {
-		            $input[ $letter ] = $count / $total_letters;
-		            if ( $input[ $letter ] > $highest ) {
-		                $highest = $input[ $letter ];
-		            }
-		        }
-		        if ( $sort_by_key ) {
-		            ksort( $input );
-		        } else {
-		            arsort( $input );
-		        }
-		        $color_scale = 1 / $highest;
-		        if ( $echo ) {
-		            foreach ( $input as $letter => $percent ) {
-		                echo '<tr><th>' . strtoupper( $letter ) . '</th><td style="background-color:hsl(' . round( ( $percent * 100 ) * $color_scale ) . 'deg 100% 50% / 50%);">' . round( $percent * 100, 1 ) . "%</td></tr>";
-		            }
-		        }
-		        $input[ 'highest' ] = $highest;
-		        return ( $input );
-		    }
-		    $tables = ob_get_contents();
-		    ob_end_clean();
-		    $break = 0;
-		    foreach ( $word_list as $word ) {
-		        if ( !$form_entries ) {
-		            $skip_word = false;
-		            foreach ( str_split( $word ) as $letter ) {
-		                if ( substr_count( $word, $letter ) >= 2 ) {
-		                    $skip_word = true;
-		                }
-		            }
-		        } else {
-		            $skip_word = false;
-		        }
-		        if ( !$skip_word ) {
-		            $letter     = str_split( " " . $word );
-		            $word_score = 0;
-		            for ( $i = 1; $i < count( $letter ); $i++ ) {
-		                $word_score += $frequency_position[ $i ][ $letter[ $i ] ];
-		            }
-		            $words_scored[ $word ] = $word_score;
-		        }
-		    }
-		    arsort( $words_scored );
-		    echo "<div class=\"\"><p>High Quality Guesses Based on Positional Frequency:</p><ul style=\" columns: 3;
-		   -webkit-columns: 3;
-		   -moz-columns: 3;\">";
-		    $i = 1;
-		    foreach ( $words_scored as $word => $score ) {
-		        echo "<li>" . ucfirst( $word ) . "</li>";
-		        $i++;
-		        if ( $i > 45 ) {
-		            break;
-		        }
-		    }
-		    echo "</ul></div>";
-		    echo "<hr>
-		   <div class=\"text-center\">Possible Words Based on Limiters: " . count( $word_list ) . "<br>Total Words in Word List: $total_words<br>
-		   <hr>
-		   $tables";
-		    echo "<br><div class=\"text-center\"><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</div>";
-		?>
-	</div>
-	<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js">
-	</script> 
-	<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js">
-	</script> 
-	<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js">
-	</script>
-</body>
-</html>
+
+//var_dump( $frequency_position);
+
+                foreach ( $word_list as $word ) { //work through each word to grade it's quality based on positional probablity
+                    $letter     = str_split( $word ); //split the word into letters
+                    $word_score = 0;//reset for calculating the word score
+                    for ( $i = 0; $i < count( $letter ); $i++ ) { //loop through word
+                        $word_score += $frequency_position[ $i+1 ][ $letter[ $i ] ]; //add score up (frequency position's offset starts at 1 rather than zero)
+                    }
+                    $words_scored[ $word ] = $word_score;//collect scores
+                }
+
+                arsort( $words_scored ); //sort the words by the scores 
+
+                echo "<div class=\"\"><ul style=\" list-decoration:none;columns: 3;-webkit-columns: 3;-moz-columns: 3;\">";
+                $number_of_words = 1; //
+                foreach ( $words_scored as $word => $score ) { // loop through the sorted words
+                    echo "<li>" . ucfirst( $word ) . " - " . round ( $score * 100 )." </li>"; //pretty print a list
+                    $number_of_words++;
+                    if ( $number_of_words > 15 ) { //stop looping through words after a certain number
+                        break;
+                    }
+                }
+
+     
+                echo "</ul></div>";
+
+
+
+                function clean_input( $input ) {
+                    $input = strtolower( trim( $input ) ); // remove spaces around the letter and lowercase the letter
+                    $input = substr( $input, 0, 1 ); // trim the string to one letter
+                    $input = preg_replace( '/[^a-z]/', '', $input ); // remove anything that isn't a lowercase letter
+                    if ( strlen( $input ) != 1 ) { //after the above validation if we don't have one letter left, set the string to be blank
+                        return ( '' );
+                    } else {
+                        return ( $input );
+                    }
+                }
