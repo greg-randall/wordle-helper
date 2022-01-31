@@ -155,12 +155,29 @@
                     $total_letters++;
                 }
             }
+            $highest_frequency = 0;
+            foreach ( $frequency_raw as $letter => $count ) { // generate overall proabilities for all words
+                $frequency[ $letter ] = ( $count / $total_letters ) * 100; //calcuate actual probablity
+                if($frequency[ $letter ]>$highest_frequency){//collect the highest frequency percentage for creating a color scale below
+                    $highest_frequency = $frequency[ $letter ];
+                }
+            }
+            arsort( $frequency );//sort by highest percentage first
+//var_dump($frequency);
+            
             foreach ( $frequency_position_raw as $index => $position ) { //look at the first position probablites
+                $highest_frequency_position[$index] = 0;
                 foreach ( $position as $letter => $count ) { // look at each letter in the postional probablites
                     $frequency_position[ $index ][ $letter ] = ( $count / ( $total_letters / 5 ) ) * 100; //calcuate actual probablity
+                    if($frequency_position[ $index ][ $letter ]>$highest_frequency_position[$index]){//collect the highest frequency percentage for each letter position for creating a color scale below
+                        $highest_frequency_position[$index] =$frequency_position[ $index ][ $letter ];
+                    }
                 }
-                ksort( $frequency_position[ $index ] );
-            }
+                ksort( $frequency_position[ $index ] );//sort the letter frequency position tables by the letter
+           }
+//var_dump( $highest_frequency_position );
+//var_dump( $frequency_position);
+            
             foreach ( $word_list as $word ) { //work through each word to grade it's quality based on positional probablity
                 $letter     = str_split( $word ); //split the word into letters
                 $word_score = 0; //reset for calculating the word score
@@ -170,7 +187,7 @@
                 $words_scored[ $word ] = $word_score; //collect scores
             }
             arsort( $words_scored ); //sort the words by the scores 
-            echo "<div class=\"\"><ul style=\" list-decoration:none;columns: 3;-webkit-columns: 3;-moz-columns: 3;\">";
+            echo "<div class=\"\"><ul style=\" list-style:none;columns: 3;-webkit-columns: 3;-moz-columns: 3;\">";
             $number_of_words = 1; //
             foreach ( $words_scored as $word => $score ) { // loop through the sorted words
                 echo "<li>" . ucfirst( $word ) . " - " . round( $score * 100 ) . " </li>"; //pretty print a list
@@ -181,6 +198,64 @@
             }
             echo "</ul></div>";
             echo " <div class=\"text-center\">Possible Words Based on Limiters: " . count( $word_list ) . "<br>Total Words in Word List: $total_words<hr>";
+           
+            //create the graphs of letter frequency based on current word list
+            echo '<div class="row"> 
+		    <div class="col-md-3">
+		    <div class="text-center">
+		        <table class="table table-sm">
+		            <tr>
+		                <th colspan="2">Overall Frequency</th>
+		            </tr>
+		            <tr>
+		                <th>Letter</th>
+		                <th>Percentage</th>
+		            </tr>';
+                    $color_scale = 100 / $highest_frequency; //we're doing a basic color range for our table cells to help show which letters are more frequent. HSV color makes this easy, 0 = red & 100=green. this scales the highest frequency to be the greenest
+                    foreach($frequency as $letter => $percent){ //run through each letter in the overall frequency count and print our table
+                        echo '<tr><th>' . strtoupper( $letter ) . '</th><td style="background-color:hsl(' . round(  $percent  * $color_scale ) . 'deg 100% 50% / 50%);">' . round( $percent , 1 ) . '%</td></tr>'; //output the prercentage and color for a cell
+                    }
+            echo '</table></div></div>';
+
+            //create the graphs of positional letter frequency
+		    echo '<div class="col-md-9">
+		    <div class="text-center" >
+		        <table class="table table-sm">
+		            <tr>
+		                <th colspan="7">Positional Frequency</th>
+		            </th>
+		            <tr>
+		                <th>&nbsp;</th>
+		                <th>1</th>
+		                <th>2</th>
+		                <th>3</th>
+		                <th>4</th>
+		                <th>5</th>
+		                <th>&nbsp;</th>';
+		    
+            $letters_left = array_keys($frequency);//get all the remaining letters in case one of the letter positions below doesn't have a letter in it's corpus
+            sort($letters_left); //sort the letters so they're alphabetical
+//var_dump($letters_left); 
+
+		    foreach ( $letters_left as $letter ) { //loop through remaining letters
+		        echo "<tr><th>" . strtoupper( $letter ) . "</th>";//print the start of the row with the letter
+		        for ( $i = 1; $i <= 5; $i++ ) {
+		            if ( !isset( $frequency_position[ $i ][ $letter ] ) ) { //if a value doesn't exist set it to zero
+		                $frequency_position[ $i ][ $letter ] = 0;
+		            }
+		            echo '<td style="background-color:hsl(' . round( $frequency_position[ $i ][ $letter ]  * (100/$highest_frequency_position[$i]) ) . 'deg 100% 50% / 50%);">' . round( $frequency_position[ $i ][ $letter ], 2 ) . '%</td>'; //output the prercentage and color for a cell
+		        }
+		        echo "<th>" . strtoupper( $letter ) . "</th></tr>";//print the end of the row with the letter
+		    }
+		    echo '</table></div></div></div>';
+           
+           
+           
+           
+          
+           
+           
+           
             echo "<br><div class=\"text-center\"><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</div>";
         ?>
          </div>
