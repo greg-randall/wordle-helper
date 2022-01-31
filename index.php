@@ -26,7 +26,7 @@
 		<h1 class="text-center">Hello, Wordle!</h1>
 		<div class="text-center">
 			<hr>
-		<?php
+		<?php  $start        = microtime( true ); //timer to check that we aren't running too long.
 
 
            if(count($_POST)>=1){//check to see if we got anything in the form
@@ -54,7 +54,7 @@
                         echo '<div class="row">';
                         for($j=1;$j<=5;$j++){ //by 5 letters
                             if(isset($letters[$i][$j])){ //make sure the letter variable is set before we reference
-                                $form_letter= strtoupper($letters[$i][$j]);
+                                $form_letter = strtoupper($letters[$i][$j]);
                             }else{
                                 $form_letter='';
                             }
@@ -97,8 +97,66 @@
 
             <?php
                 $word_list     = explode( PHP_EOL, file_get_contents( 'list.txt' ) ); //get the wordlist and convert it to an array
+                
                 $total_words   = count( $word_list );
-                                foreach ( $word_list as $word ) { //look at each word individually
+
+                $exclude_list='';
+                $include_list='';
+                for($i=1;$i<=6;$i++){ //6 rows
+                    for($j=1;$j<=5;$j++){ //by 5 letters
+                        if(isset($letter_type[$i][$j])){
+                            switch ($letter_type[$i][$j]) {
+                                case 'e':
+                                    $exclude_list = $exclude_list . $letters[$i][$j];
+                                    break;
+                                case 'i':
+                                    $include_list = $include_list . $letters[$i][$j];
+                                    break;
+                                case 'c':
+                                    $correct_letter[$j] = $letters[$i][$j];
+                                    break;                                       
+                            }
+                        }                        
+                    }
+                }
+
+             //   var_dump($exclude_list);
+             //  var_dump($include_list);
+               // var_dump($correct_letter);
+
+//strip words from list that have excluded letters
+               if(strlen($exclude_list)!==0){ 
+                //$exclude_list = array_diff( $exclude_list, $p ); //remove all the greens from the excludes
+                    //remove words with gray letters from word list
+                    foreach ( $word_list as $key => $word ) {
+                        foreach ( str_split($exclude_list) as $letter ) {//go through each letter of each word
+                            if ( substr_count( $word, $letter ) > 0 ) { // if we find a letter from the exclude list remove the word
+                                unset( $word_list[ $key ] );
+                            }
+                        }
+                    }
+               }
+
+//strip words from list that have do not have included letters
+               if(strlen($include_list)!==0){ 
+                    if(isset($correct_letter)&&count($correct_letter)>=1){ // make sure there are correct positioned letters before we reference the variable
+                        $include_list = $include_list . implode($correct_letter); // include list has both green and gold letters
+                    }
+                    $include_list = implode(array_diff( str_split($include_list) ,  str_split($exclude_list) ) ); //remove all the excludes from the includes
+                    //make sure that words have letters from the green list
+                    foreach ( $word_list as $key => $word ) {
+                        foreach ( str_split($include_list) as $letter ) {//go through each letter of each word
+                            if ( substr_count( $word, $letter ) < 1 ) {// if we dont find a letter from the include list remove the word
+                                unset( $word_list[ $key ] );
+                            }
+                        }
+                    }
+                }
+
+
+
+                $total_letters = 0;
+                foreach ( $word_list as $word ) { //look at each word individually
                     $letters = str_split( $word ); // turn the word into an array
                     for ( $i = 0; $i < count( $letters ); $i++ ) { //loop through the letters of each word
 
@@ -116,13 +174,13 @@
                         } else {
                             $frequency_position_raw[ $i + 1 ][ $letters[ $i ] ] = 1;
                         }
-
+                        $total_letters++;
                     }
                 }
 
 		        foreach ( $frequency_position_raw as $index => $position) { //look at the first position probablites
                    foreach ($position as $letter => $count ){ // look at each letter in the postional probablites
-                        $frequency_position [$index][ $letter ] = ( $count / ( $total_words ) ) * 100; //calcuate actual probablity
+                        $frequency_position [$index][ $letter ] = ( $count / ( $total_letters / 5 ) ) * 100; //calcuate actual probablity
                    }
                    ksort($frequency_position [$index]);
 		        }
@@ -155,7 +213,24 @@
 
 
 
-                function clean_input( $input ) {
+
+
+               echo" <div class=\"text-center\">Possible Words Based on Limiters: " . count( $word_list ) . "<br>Total Words in Word List: $total_words<hr>";
+
+                 echo "<br><div class=\"text-center\"><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</div>";
+             ?>
+         </div>
+         <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js">
+         </script> 
+         <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js">
+         </script> 
+         <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js">
+         </script>
+     </body>
+     </html>
+
+<?php
+                function clean_input( $input ) { //sanatize input
                     $input = strtolower( trim( $input ) ); // remove spaces around the letter and lowercase the letter
                     $input = substr( $input, 0, 1 ); // trim the string to one letter
                     $input = preg_replace( '/[^a-z]/', '', $input ); // remove anything that isn't a lowercase letter
@@ -165,3 +240,8 @@
                         return ( $input );
                     }
                 }
+
+                ?>
+
+
+
