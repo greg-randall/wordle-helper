@@ -44,7 +44,7 @@
                         }
                     }
                 }
-            ?>
+            ?><div class="row"><div class="col-md-6">
             <form action="index.php" method="post"> 
             <?php //print out the form
                 for ( $i = 1; $i <= 6; $i++ ) { //6 rows
@@ -70,6 +70,8 @@
                                     $correct = ' checked';
                                     break;
                             }
+                        }else{
+                            $exclude = ' checked';//by default set the check to 'exclude'
                         }
                         echo '<div class="col-xs-2 ml-1 m-r1"><input maxlength="1" name="' . $i . '_' . $j . '" size="1" type="text" value="' . $form_letter . '"><br>
                                         <div style="background-color:#787c7e;"><input style="margin-left:-5px;" type="radio" name="radio_' . $i . '_' . $j . '" value="exclude"' . $exclude . '></div>
@@ -77,13 +79,14 @@
                                         <div style="background-color:#6aaa64;"><input style="margin-left:-5px;" type="radio" name="radio_' . $i . '_' . $j . '" value="correct"' . $correct . '></div>
                                         </div>'; //output the form row with the valid entries
                     }
-                    echo '</div><br>';
+                    echo '</div>';
                 }
+               echo'<input type="submit"></form></div> <br>
+				
+			';
             ?>
       
-                <br>
-				<input type="submit">
-			</form>
+
 
 
         <?php
