@@ -108,6 +108,7 @@
                     }
                 }
             }
+            
             //strip words from list that have excluded letters
             if ( strlen( $exclude_list ) !== 0 ) {
                 //$exclude_list = array_diff( $exclude_list, $p ); //remove all the greens from the excludes
@@ -121,20 +122,40 @@
                 }
             }
             //strip words from list that have do not have included letters
-            if ( strlen( $include_list ) !== 0 ) {
-                if ( isset( $correct_letter ) && count( $correct_letter ) >= 1 ) { // make sure there are correct positioned letters before we reference the variable
-                    $include_list = $include_list . implode( $correct_letter ); // include list has both green and gold letters
-                }
-                $include_list = implode( array_diff( str_split( $include_list ), str_split( $exclude_list ) ) ); //remove all the excludes from the includes (turn each variable into an array then diff them them turn back into a string)
-                //make sure that words have letters from the green list
-                foreach ( $word_list as $key => $word ) {
-                    foreach ( str_split( $include_list ) as $letter ) { //go through each letter of each word
-                        if ( substr_count( $word, $letter ) < 1 ) { // if we dont find a letter from the include list remove the word
-                            unset( $word_list[ $key ] );
+            if(count($word_list)>1){//make sure there are words to strip still
+                if ( strlen( $include_list ) !== 0 ) {
+                    if ( isset( $correct_letter ) && count( $correct_letter ) >= 1 ) { // make sure there are correct positioned letters before we reference the variable
+                        $include_list = $include_list . implode( $correct_letter ); // include list has both green and gold letters
+                    }
+                    $include_list = implode( array_diff( str_split( $include_list ), str_split( $exclude_list ) ) ); //remove all the excludes from the includes (turn each variable into an array then diff them them turn back into a string)
+                    //make sure that words have letters from the green list
+                    foreach ( $word_list as $key => $word ) {
+                        foreach ( str_split( $include_list ) as $letter ) { //go through each letter of each word
+                            if ( substr_count( $word, $letter ) < 1 ) { // if we dont find a letter from the include list remove the word
+                                unset( $word_list[ $key ] );
+                            }
                         }
                     }
                 }
             }
+//var_dump($correct_letter);
+            //remove words that dont match position -- green letters
+            if(count($word_list)>1){//make sure there are words to strip still
+                if ( isset($correct_letter) && strlen( trim( implode( $correct_letter ) ) ) > 0 ) { //make sure we have a green letter set
+                    foreach ( $word_list as $key => $word ) { //loop through each word
+                        $word = str_split( $word ); //split each word into letters
+                        for ( $i = 0; $i < 5; $i++ ) { //loop through each letter
+                            if(isset($correct_letter[$i + 1])&& $correct_letter[$i + 1]!==''){//make sure the current letter is set
+                                if($correct_letter[$i + 1] != $word[ $i ]){//if the word from the word list doesnt match the correct letter position remove it
+                                    unset( $word_list[ $key ] );
+                                }
+                            }
+
+                        }
+                    }
+                }
+            }
+            
             $total_letters = 0;
             foreach ( $word_list as $word ) { //look at each word individually
                 $letters = str_split( $word ); // turn the word into an array
@@ -184,19 +205,69 @@
                 for ( $i = 0; $i < count( $letter ); $i++ ) { //loop through word
                     $word_score += $frequency_position[ $i + 1 ][ $letter[ $i ] ]; //add score up (frequency position's offset starts at 1 rather than zero)
                 }
-                $words_scored[ $word ] = $word_score; //collect scores
+                $words_scored_position[ $word ] = $word_score/5; //collect scores
             }
-            arsort( $words_scored ); //sort the words by the scores 
-            echo "<div class=\"\"><ul style=\" list-style:none;columns: 3;-webkit-columns: 3;-moz-columns: 3;\">";
-            $number_of_words = 1; //
-            foreach ( $words_scored as $word => $score ) { // loop through the sorted words
-                echo "<li>" . ucfirst( $word ) . " - " . round( $score * 100 ) . " </li>"; //pretty print a list
-                $number_of_words++;
-                if ( $number_of_words > 15 ) { //stop looping through words after a certain number
-                    break;
+            arsort( $words_scored_position ); //sort the words by the scores 
+
+            if(isset($include_list)&&isset($correct_letter)){
+                $include_and_correct = implode(array_unique(str_split($include_list . implode($correct_letter)))); //get all the letters from the include and correct letter variables in one string
+            }elseif(isset($include_list)){
+                $include_and_correct = $include_list;
+            }elseif(isset($correct_letter)){
+                $include_and_correct = $correct_letter;
+            }else{
+                $include_and_correct = '';
+            }
+           // $i=0;
+           if(count($word_list)<100){
+               $random_words_count = count($word_list);
+           }else{
+             $random_words_count =100;
+           }
+           if(count($word_list)>1){// make sure there's more than one possible word
+                $short_word_list = array_rand($word_list, $random_words_count);
+                    foreach ( $short_word_list as $key ) { //work through each word to grade it's quality based on how many words it eliminates if guessed
+                        $word = $word_list[$key];
+                        $score = 1 - ( words_remaining_no_matches( $word, $include_and_correct, $word_list ) / count($word_list) );//collect scores
+                        if($score>0){
+                            $words_scored_elimination[ $word ] = $score;
+                        }else{
+                            $words_scored_elimination[ $word ] = 0;
+                        }
+                        //echo "$word<br>";
+                        //$i++;if($i>100){break;}
+                    }
+                    arsort($words_scored_elimination);
+                    //var_dump($words_scored_elimination);
+            
+                
+            //print words sorted by how well they match up with the positions
+                echo "<div><ul style=\" list-style:none;\">";
+                $number_of_words = 1; //
+                foreach ( $words_scored_position as $word => $score ) { // loop through the sorted words
+                    echo "<li>" . ucfirst( $word ) . " - " . round( $score , 1 ) . " </li>"; //pretty print a list
+                    $number_of_words++;
+                    if ( $number_of_words > 15 ) { //stop looping through words after a certain number
+                        break;
+                    }
                 }
-            }
-            echo "</ul></div>";
+                echo "</ul></div>";
+
+                //print words based on how well they eliminate possibiltes 
+                echo "<div><ul style=\" list-style:none;\">";
+                $number_of_words = 1; //
+                foreach ( $words_scored_elimination as $word => $score ) { // loop through the sorted words
+                    echo "<li>" . ucfirst( $word ) . " - " . round( $score * 100,1 ) . " </li>"; //pretty print a list
+                    $number_of_words++;
+                    if ( $number_of_words > 15 ) { //stop looping through words after a certain number
+                        break;
+                    }
+                }
+                echo "</ul></div><hr>";
+        }else{
+            echo "Only one word possible: " .array_pop($word_list)."<br><hr>";
+        }
+
             echo " <div class=\"text-center\">Possible Words Based on Limiters: " . count( $word_list ) . "<br>Total Words in Word List: $total_words<hr>";
            
             //create the graphs of letter frequency based on current word list
@@ -278,6 +349,22 @@
         } else {
             return ( $input );
         }
+    }
+    function words_remaining_no_matches( $exclude_list, $include_list, $word_list ){
+        if(strlen($include_list)>0){
+            $exclude_list = implode(array_diff( str_split($exclude_list), str_split($include_list) ));//remove all the include letters from the exclude word
+        }
+        foreach ( $word_list as $key => $word ) {
+            //speed up with array key exists? 
+            foreach ( str_split( $exclude_list ) as $letter ) { //go through each letter of each word
+                if (strlen($letter)>0){  
+                  if(substr_count( $word, $letter ) >= 1 ) { // if we dont find a letter from the include list remove the word
+                    unset( $word_list[ $key ] );
+                  }
+                }
+            }
+        }
+        return (count($word_list));
     }
 ?>
 
