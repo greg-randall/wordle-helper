@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+?><!DOCTYPE html>
 <html lang="en">
 <head>
 	<!-- Required meta tags -->
@@ -17,14 +21,18 @@
 	           font-family: monospace !important;
 	       }
 
-
-
+          /*
+           div { border: 1px solid #000000 !important;  }
+          */
+           input[type=radio]{
+            margin-left:5px;
+           }
 	</style>
 </head>
 <body>
 	<div class="container">
 		<h1 class="text-center">Hello, Wordle!</h1>
-		<div class="text-center">
+		
 			<hr>
             <?php
                 $start = microtime( true ); //timer to check that we aren't running too long.
@@ -43,12 +51,15 @@
                             $letters[ $box[ 0 ] ][ $box[ 1 ] ] = $letter; //add the validated input to the array
                         }
                     }
+                    $no_post_input=false;
+                }else{
+                    $no_post_input=true; // record that we didnt get any input so we can tweak some of the bits below to do better anaylis 
                 }
-            ?><div class="row"><div class="col-md-6">
-            <form action="index.php" method="post"> 
+            ?>
+            <div class="row"><div class="col-md-4"><form action="index.php" method="post"> 
             <?php //print out the form
                 for ( $i = 1; $i <= 6; $i++ ) { //6 rows
-                    echo '<div class="row">';
+                    echo '<div class="row mb-3">';
                     for ( $j = 1; $j <= 5; $j++ ) { //by 5 letters
                         if ( isset( $letters[ $i ][ $j ] ) ) { //make sure the letter variable is set before we reference
                             $form_letter = strtoupper( $letters[ $i ][ $j ] );
@@ -74,9 +85,9 @@
                             $exclude = ' checked';//by default set the check to 'exclude'
                         }
                         echo '<div class="col-xs-2 ml-1 m-r1"><input maxlength="1" name="' . $i . '_' . $j . '" size="1" type="text" value="' . $form_letter . '"><br>
-                                        <div style="background-color:#787c7e;"><input style="margin-left:-5px;" type="radio" name="radio_' . $i . '_' . $j . '" value="exclude"' . $exclude . '></div>
-                                        <div style="background-color:#c9b458;"><input style="margin-left:-5px;" type="radio" name="radio_' . $i . '_' . $j . '" value="include"' . $include . '></div>
-                                        <div style="background-color:#6aaa64;"><input style="margin-left:-5px;" type="radio" name="radio_' . $i . '_' . $j . '" value="correct"' . $correct . '></div>
+                                        <div style="background-color:#787c7e;"><input type="radio" name="radio_' . $i . '_' . $j . '" value="exclude"' . $exclude . '></div>
+                                        <div style="background-color:#c9b458;"><input type="radio" name="radio_' . $i . '_' . $j . '" value="include"' . $include . '></div>
+                                        <div style="background-color:#6aaa64;"><input type="radio" name="radio_' . $i . '_' . $j . '" value="correct"' . $correct . '></div>
                                         </div>'; //output the form row with the valid entries
                     }
                     echo '</div>';
@@ -90,28 +101,37 @@
 
 
         <?php
-            $word_list    = explode( PHP_EOL, file_get_contents( 'list.txt' ) ); //get the wordlist and convert it to an array
+            $word_list    = explode( ",", file_get_contents( 'list.txt' ) ); //get the wordlist and convert it to an array
             $total_words  = count( $word_list );
             $exclude_list = '';
             $include_list = '';
-            for ( $i = 1; $i <= 6; $i++ ) { //6 rows
-                for ( $j = 1; $j <= 5; $j++ ) { //by 5 letters
-                    if ( isset( $letter_type[ $i ][ $j ] ) ) {
-                        switch ( $letter_type[ $i ][ $j ] ) {
-                            case 'e':
-                                $exclude_list = $exclude_list . $letters[ $i ][ $j ];
-                                break;
-                            case 'i':
-                                $include_list = $include_list . $letters[ $i ][ $j ];
-                                break;
-                            case 'c':
-                                $correct_letter[ $j ] = $letters[ $i ][ $j ];
-                                break;
+
+            if($no_post_input){ //if we didnt get any input we're going to clean up the list a bit for a better first word
+                foreach ( $word_list as $key => $word ) {//go through each word
+                        $regex = '/(.)(.+)?\1/';// the regex here looks for words with two of the same letter (or more) ie goody, again, etc
+                        if (preg_match($regex, $word)) { //if we found a match in the word, we'll remove it from the list
+                             unset( $word_list[ $key ] );
+                        }
+                }
+            }else{
+                for ( $i = 1; $i <= 6; $i++ ) { //6 rows
+                    for ( $j = 1; $j <= 5; $j++ ) { //by 5 letters
+                        if ( isset( $letter_type[ $i ][ $j ] ) ) {
+                            switch ( $letter_type[ $i ][ $j ] ) {
+                                case 'e':
+                                    $exclude_list = $exclude_list . $letters[ $i ][ $j ];
+                                    break;
+                                case 'i':
+                                    $include_list = $include_list . $letters[ $i ][ $j ];
+                                    break;
+                                case 'c':
+                                    $correct_letter[ $j ] = $letters[ $i ][ $j ];
+                                    break;
+                            }
                         }
                     }
                 }
             }
-            
             //strip words from list that have excluded letters
             if ( strlen( $exclude_list ) !== 0 ) {
                 //$exclude_list = array_diff( $exclude_list, $p ); //remove all the greens from the excludes
@@ -222,16 +242,21 @@
                 $include_and_correct = '';
             }
            // $i=0;
-           if(count($word_list)<100){
+           $words_to_examine = 100;
+           if(count($word_list)<$words_to_examine){
                $random_words_count = count($word_list);
            }else{
-             $random_words_count =100;
+             $random_words_count =$words_to_examine;
            }
            if(count($word_list)>1){// make sure there's more than one possible word
                 $short_word_list = array_rand($word_list, $random_words_count);
-                    foreach ( $short_word_list as $key ) { //work through each word to grade it's quality based on how many words it eliminates if guessed
+//print_r($short_word_list);
+                foreach ( $short_word_list as $key ) { //work through each word to grade it's quality based on how many words it eliminates if guessed
                         $word = $word_list[$key];
-                        $score = 1 - ( words_remaining_no_matches( $word, $include_and_correct, $word_list ) / count($word_list) );//collect scores
+                        $raw_output = words_remaining_no_matches( $word, $include_and_correct, $word_list );
+
+                        $score = 1 - ( $raw_output / count($word_list) );//collect scores
+//echo "$word -- $raw_output -- $score <br>";
                         if($score>0){
                             $words_scored_elimination[ $word ] = $score;
                         }else{
@@ -239,13 +264,13 @@
                         }
                         //echo "$word<br>";
                         //$i++;if($i>100){break;}
-                    }
+                }
                     arsort($words_scored_elimination);
                     //var_dump($words_scored_elimination);
             
                 
             //print words sorted by how well they match up with the positions
-                echo "<div><ul style=\" list-style:none;\">";
+                echo "<div class=\"col-md-8\"><div class=\"row\"><div class=\"col-md-4\"><h2>Frequency</h2><ul style=\" list-style:none;\">";
                 $number_of_words = 1; //
                 foreach ( $words_scored_position as $word => $score ) { // loop through the sorted words
                     echo "<li>" . ucfirst( $word ) . " - " . round( $score , 1 ) . " </li>"; //pretty print a list
@@ -257,26 +282,26 @@
                 echo "</ul></div>";
 
                 //print words based on how well they eliminate possibiltes 
-                echo "<div><ul style=\" list-style:none;\">";
+                echo "<div class=\"col-md-4\"><h2>Exlcudes</h2><ul style=\" list-style:none;\">";
                 $number_of_words = 1; //
                 foreach ( $words_scored_elimination as $word => $score ) { // loop through the sorted words
-                    echo "<li>" . ucfirst( $word ) . " - " . round( $score * 100,1 ) . " </li>"; //pretty print a list
+                    echo "<li>" . ucfirst( $word ) . " - " . round( $score * 100,1 ) . "%</li>"; //pretty print a list
                     $number_of_words++;
                     if ( $number_of_words > 15 ) { //stop looping through words after a certain number
                         break;
                     }
                 }
-                echo "</ul></div><hr>";
+                echo "</ul></div></div>";
         }else{
-            echo "Only one word possible: " .array_pop($word_list)."<br><hr>";
+            echo "Only one word possible: " .array_pop($word_list)."<br>";
         }
 
             echo " <div class=\"text-center\">Possible Words Based on Limiters: " . count( $word_list ) . "<br>Total Words in Word List: $total_words<hr>";
-           
+           echo "</div>";
             //create the graphs of letter frequency based on current word list
             echo '<div class="row"> 
 		    <div class="col-md-3">
-		    <div class="text-center">
+		    
 		        <table class="table table-sm">
 		            <tr>
 		                <th colspan="2">Overall Frequency</th>
@@ -289,7 +314,7 @@
                     foreach($frequency as $letter => $percent){ //run through each letter in the overall frequency count and print our table
                         echo '<tr><th>' . strtoupper( $letter ) . '</th><td style="background-color:hsl(' . round(  $percent  * $color_scale ) . 'deg 100% 50% / 50%);">' . round( $percent , 1 ) . '%</td></tr>'; //output the prercentage and color for a cell
                     }
-            echo '</table></div></div>';
+            echo '</table></div>';
 
             //create the graphs of positional letter frequency
 		    echo '<div class="col-md-9">
@@ -297,7 +322,7 @@
 		        <table class="table table-sm">
 		            <tr>
 		                <th colspan="7">Positional Frequency</th>
-		            </th>
+		            </tr>
 		            <tr>
 		                <th>&nbsp;</th>
 		                <th>1</th>
@@ -324,13 +349,7 @@
 		    echo '</table></div></div></div>';
            
            
-           
-           
-          
-           
-           
-           
-            echo "<br><div class=\"text-center\"><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</div>";
+            echo "<br><div class=\"text-center\"><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</strong>";
         ?>
          </div>
          <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js">
@@ -357,6 +376,7 @@
         if(strlen($include_list)>0){
             $exclude_list = implode(array_diff( str_split($exclude_list), str_split($include_list) ));//remove all the include letters from the exclude word
         }
+//echo $exclude_list ."<br>";
         foreach ( $word_list as $key => $word ) {
             //speed up with array key exists? 
             foreach ( str_split( $exclude_list ) as $letter ) { //go through each letter of each word
