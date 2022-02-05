@@ -43,8 +43,8 @@ error_reporting(E_ALL);
     $debug = true;
     $debug_output = '';
     $start = microtime( true ); //timer to check that we aren't running too long.
-    if ( count( $_POST ) >= 1 ) { //check to see if we got anything in the form
-        foreach ( $_POST as $box => $form_input ) { //look at each square from the form
+    if ( count( $_GET ) >= 1 ) { //check to see if we got anything in the form
+        foreach ( $_GET as $box => $form_input ) { //look at each square from the form
             if ( stripos( $box, 'radio' ) !== false ) //check to see what kind of input we're looking at, if it says 'radio' it's the type of letter, ie exclude, include, correct
                 {
                 $radio_data                            = $form_input;
@@ -65,7 +65,7 @@ error_reporting(E_ALL);
     } else {
         $no_post_input = true; // record that we didnt get any input so we can tweak some of the bits below to do better anaylis 
     }
-    echo '<div class="row"><div class="col-md-4"><form action="index.php" method="post"> ';
+    echo '<div class="row"><div class="col-md-4"><form action="index.php" method="get"> ';
     //print out the form
     for ( $i = 1; $i <= 6; $i++ ) { //6 rows
         echo '<div class="row mb-3">';
@@ -111,14 +111,10 @@ error_reporting(E_ALL);
     $word_list   = explode( ",", file_get_contents( 'list.txt' ) );
     $total_words = count( $word_list );
     
-    //if we didnt get any input or we didnt get any gold/green words we're gonna skip all the words that have two of the same letters
+    //if we didnt get any input we're gonna skip all the words that have two of the same letters
     if ( $no_post_input ) {
-        foreach ( $word_list as $key => $word ) { //go through each word
-            $regex = '/(.)(.+)?\1/'; // the regex here looks for words with two of the same letter (or more) ie goody, again, etc
-            if ( preg_match( $regex, $word ) ) { //if we found a match in the word, we'll remove it from the list
-                unset( $word_list[ $key ] );
-            }
-        }
+        $regex = '/.*(.).*\1.*/'; 
+        $word_list = preg_grep($regex,$word_list, PREG_GREP_INVERT );
     }
 
 // add postionally aware matching for all these
@@ -152,7 +148,6 @@ error_reporting(E_ALL);
                     }      
             }
 
-//capturing output for debug
 
             $regex = '';
             for($k=1;$k <= 5; $k++){
@@ -177,14 +172,12 @@ error_reporting(E_ALL);
 
             $debug_output .= "<br><br>$i:<br>";//grays - $collected_grays<br> green/yellows - $collected_yellows_greens<br>";
            
-            //$debug_output .= "grays and greens/yellows match-- ".$exclude_include_intersection."<br>";
-
             $regex         = "/^$regex$/";
-            $debug_output .= "words left: ".count($word_list)."<br>";
+            $debug_output .= "words left: ".count($word_list)."<br>&nbsp;&nbsp;&nbsp;";
             $debug_output .= $regex ."<br>";
             
             $word_list     = preg_grep( $regex, $word_list);
-            $debug_output .= "words left: ".count($word_list)."<br>";
+            $debug_output .= "words left: ".count($word_list)."<br>&nbsp;&nbsp;&nbsp;";
             //generate regex for must contain charecters
             $regex='';
             if(strlen($collected_yellows_greens)>=2){
@@ -272,6 +265,28 @@ error_reporting(E_ALL);
         for ( $i = 0; $i < count( $temp_exclude ); $i++ ) { 
             $frequency_and_exclude_score[ $temp_exclude[ $i ] ] = $i;
         }
+
+        //when we get low on words, use commonness as a factor in ordering the words
+        //collect the common words ranking list
+         //tweak this number to make the word commonness score lower= more effect, higher= less effect.
+        if(count($word_list)<150){
+            $commonness_factor = 2;
+        }else{
+            $commonness_factor = 8;
+        }
+            $common = file_get_contents('list_common.json');
+            $common = array_reverse(json_decode($common,true));
+        
+            //work through the combined score list
+            foreach( $frequency_and_exclude_score as $word => $rank){
+                //make sure that the word in the word list actually exists in the commonness list-- it's only about 8k words where the wordle list is 13k, so some very uncommon words don't have rankings
+                if(isset($common[$word])){
+                    //add the commonness to the score
+                    $frequency_and_exclude_score [ $word ] = $rank + (( count($frequency_and_exclude_score) * $common[$word] ) / count($common) / $commonness_factor ) ;  //the math here scales the commonness score to something that makes sense in the context of the remaining word counts
+                }
+            }
+        
+
         //work through each word and generate a rank based on the rating systems, above
         for ( $i = 0; $i < count( $temp_frequency ); $i++ ) { 
             $frequency_and_exclude_score[ $temp_frequency[ $i ] ] += $i;
@@ -279,9 +294,14 @@ error_reporting(E_ALL);
         }
         unset($temp_frequency);
         unset($temp_exclude);
-
         arsort( $frequency_and_exclude_score );
-       
+
+        //when the remaining word list gets short get the rannking of most common words to least common words
+        if(count($word_list)<150){
+            $common = file_get_contents('list_common.json');
+            $common = json_decode($common,true);
+        }
+        
         $canidate_word_list_number = 20;
 
         echo '<div class="col-md-8"><div class="row">';
@@ -298,10 +318,10 @@ error_reporting(E_ALL);
         /////////////////////////////////////////////////////////
         // work on graphs
 
-  /*
+
 
     //create the graphs of positional letter frequency
-    echo '<div class="col-md-9">
+    echo '<div class="col-md-12">
             <div class="text-center" >
                 <table class="table table-sm">
                     <tr>
@@ -315,16 +335,28 @@ error_reporting(E_ALL);
                         <th>4</th>
                         <th>5</th>
                         <th>&nbsp;</th>';
-    $letters_left = array_keys( $frequency ); //get all the remaining letters in case one of the letter positions below doesn't have a letter in it's corpus
+    $letters_left =''; //get all the remaining letters in case one of the letter positions below doesn't have a letter in it's corpus
+    $i=1;
+    foreach( $frequency_position as $column ){
+        $letters_left .= implode(array_keys($column));
+        sort($column);
+       // var_dump($column);
+       // echo array_pop($column);
+       $highest_frequency_position[ $i ]  = array_pop($column);
+       $i++;
+    }
+
+    $letters_left = array_unique(str_split($letters_left));
+
     sort( $letters_left ); //sort the letters so they're alphabetical
-    //var_dump($letters_left); 
+
     foreach ( $letters_left as $letter ) { //loop through remaining letters
         echo "<tr><th>" . strtoupper( $letter ) . "</th>"; //print the start of the row with the letter
         for ( $i = 1; $i <= 5; $i++ ) {
             if ( !isset( $frequency_position[ $i ][ $letter ] ) ) { //if a value doesn't exist set it to zero
                 $frequency_position[ $i ][ $letter ] = 0;
             }
-            echo '<td style="background-color:hsl(' . round( $frequency_position[ $i ][ $letter ] * ( 100 / $highest_frequency_position[ $i ] ) ) . 'deg 100% 50% / 50%);">' . round( $frequency_position[ $i ][ $letter ], 2 ) . '%</td>'; //output the prercentage and color for a cell
+            echo '<td style="background-color:hsl(' . round( $frequency_position[ $i ][ $letter ] * ( 100 / $highest_frequency_position[ $i ] ) ) . 'deg 100% 50% / 50%);">' . round( $frequency_position[ $i ][ $letter ] *100 , 2 ) . '%</td>'; //output the prercentage and color for a cell
         }
         echo "<th>" . strtoupper( $letter ) . "</th></tr>\n"; //print the end of the row with the letter
     }
@@ -332,14 +364,12 @@ error_reporting(E_ALL);
         echo "\n\n<!-- Time Elapsed: " . ( microtime( true ) - $start ) . " seconds -->\n\n";
     }
     echo '</table></div></div></div>';
-    echo " </div></div><br><div class=\"text-center\"><p><strong>Time Elapsed: " . ( microtime( true ) - $start ) . " seconds</strong></p>";
-    if ( $removed_doubled_letters ) {
-        echo "<p>*Note that on the first run we eliminate all words that have doubled letters, since we don't want to waste some of our guessing power on doubling letters up. Additionally, if there aren't any correct letters we'll continue to eliminate doubled letters.</p>";
-    }
 
 
 
-*/
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 //helper functions
 ///////////////////////////////////////////////////////////////////////////////    
@@ -388,7 +418,7 @@ error_reporting(E_ALL);
          <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js">
          </script>
 
-<?php if(isset($debug_output)){echo $debug_output;} ?>
+<?php if(isset($debug_output)){echo "<div class=\"container\">$debug_output</div>";} ?>
      </body>
      </html>
 
