@@ -175,16 +175,16 @@ error_reporting(E_ALL);
 
 
 
-            $debug_output .= "<br><br>$i:<br>grays - $collected_grays<br> green/yellows - $collected_yellows_greens<br>";
+            $debug_output .= "<br><br>$i:<br>";//grays - $collected_grays<br> green/yellows - $collected_yellows_greens<br>";
            
-            $debug_output .= "grays and greens/yellows match-- ".$exclude_include_intersection."<br>";
+            //$debug_output .= "grays and greens/yellows match-- ".$exclude_include_intersection."<br>";
 
             $regex         = "/^$regex$/";
-            $debug_output .= "count before ".count($word_list)."<br>";
+            $debug_output .= "words left: ".count($word_list)."<br>";
             $debug_output .= $regex ."<br>";
             
             $word_list     = preg_grep( $regex, $word_list);
-            $debug_output .= "count after/before ".count($word_list)."<br>";
+            $debug_output .= "words left: ".count($word_list)."<br>";
             //generate regex for must contain charecters
             $regex='';
             if(strlen($collected_yellows_greens)>=2){
@@ -194,13 +194,17 @@ error_reporting(E_ALL);
                 }
 
                 $regex  = "/.*$regex.*/";
-            }else{
+            }elseif(strlen($collected_yellows_greens)>=1){
                 $regex  = "/^.*$collected_yellows_greens.*$/";
+            }else{
+                $regex='';
             }
-            $debug_output .= $regex ."<br>";
-            
-            $word_list     = preg_grep( $regex, $word_list);
-            $debug_output .= "count after ".count($word_list)."<br>";
+
+            if(strlen($regex)>1){
+                $debug_output .= $regex ."<br>";
+                $word_list     = preg_grep( $regex, $word_list);
+                $debug_output .= "words left: ".count($word_list)."<br>";
+            }
 //.*(?=([ing]{3,}))(?=[ng]*i)(?=[ig]*n)(?=[in]*g)\1.*
 //https://stackoverflow.com/questions/9761346/regex-match-each-character-at-least-once/9761719#9761719
 
@@ -250,7 +254,7 @@ error_reporting(E_ALL);
    //if the list is really long we trim it. 
    //seems like my home computer can do 30million comparisons in ~0.6 seconds which seems like a good limit.
     if(pow(count($word_list),2) > 30000000){
-            $word_list_short = array_rand(array_flip($word_list), 3000);//trim downwords to compare to. 
+            $word_list_short = array_rand(array_flip($word_list), 1000);//trim downwords to compare to. 
         }else{
             $word_list_short = $word_list;
         }
@@ -289,7 +293,8 @@ error_reporting(E_ALL);
         echo "</div>";
 
 
-        echo "<hr><div class=\"text-center\"><strong>Words Remaining</strong>: " . count($word_list) . " | <strong>Words Total</strong>: $total_words</div>";
+        echo "<hr><div class=\"text-center\"><strong>Words Remaining</strong>: " . count($word_list) . " | <strong>Words Total</strong>: $total_words<br><hr><strong>Processing Time</strong>: " . round (( microtime( true ) - $start ),2) . " seconds</div>";
+        
         /////////////////////////////////////////////////////////
         // work on graphs
 
